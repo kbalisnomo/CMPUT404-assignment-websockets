@@ -40,7 +40,6 @@ function debug(str) {
     var debugDiv = document.getElementById('debug');
     debugDiv.innerHTML = "" + str;
 }
-debug("Test");
 
 world = {};
 
@@ -54,8 +53,9 @@ function drawCircle(context,entity) {
         //moveTo(x,y);
         fillStyle = entity["colour"];
         strokeStyle = fillStyle;
-        arc(x, y, (entity["radius"])?entity["radius"]:50, 0, 2.0 * Math.PI, false);  
-        stroke();                                
+        arc(x, y, (entity["radius"])?entity["radius"]:10, 0, 2.0 * Math.PI, false);  
+        fill();                                
+        stroke();
     }
 }
 
@@ -64,7 +64,7 @@ function prepEntity(entity) {
         entity["colour"] = "#FF0000";
     }
     if (!entity["radius"]) {
-        entity["radius"] = 50;
+        entity["radius"] = 10;
     }
     return entity;
 }
@@ -125,6 +125,9 @@ function addEntity(entity, data) {
     world[entity] = data;
     drawNextFrame(); // (but should we?)
     //XXX: Send a XHTML Request that updates the entity you just modified!
+    let request = {};
+    request[entity] = data;
+    socket.send(JSON.stringify(request));
 }
 var counter = 0;
 function addEntityWithoutName(data) {
@@ -239,8 +242,12 @@ mouse.mouseuppers.push(function(x,y,clicked,e) {
 });
 
 mouse.mousedraggers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'green',
-                          'radius':10});
+    addEntityWithoutName({
+        'x':x,
+        'y':y,
+        'colour':'rgb('+Math.floor(Math.random()*256)+','+Math.floor(Math.random()*256)+','+Math.floor(Math.random()*256)+')',
+        'radius':10
+    });
 });
 
 
@@ -254,6 +261,17 @@ function wsSetup() {
     socket = new WebSocket(url);
     socket.onopen = function() {
         //XXX: TODO What are you going to do here?
+        // Get world
+        fetch("http://" + host + "/world").then(
+            (response) => {
+                return response.json();
+            }
+        ).then(
+            (new_world) => {
+                world = new_world;
+                drawNextFrame();
+            }
+        )
     };
     socket.onerror = function(msg) {
         debug("WebSocket Error:" + msg.data);
@@ -262,6 +280,12 @@ function wsSetup() {
         try {
             debug("WebSocket Recv:" + msg.data);
             //XXX: TODO What are you going to do here?            
+            // Update world
+            let update = JSON.parse(msg.data);
+            for (let entity in update) {
+                world[entity] = update[entity]
+            }
+            drawNextFrame();
         } catch (e) {
             alert("socket on message: " + e);
         }
